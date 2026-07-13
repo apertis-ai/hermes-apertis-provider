@@ -1,0 +1,5 @@
+name: apertis-provider
+kind: model-provider
+version: 1.0.0
+description: Apertis AI model provider for Hermes Agent
+author: Apertis AI

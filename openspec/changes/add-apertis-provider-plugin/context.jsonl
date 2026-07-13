@@ -1,0 +1,4 @@
+{"file":"openspec/changes/add-apertis-provider-plugin/scope-contract.md","reason":"Locked ownership and non-goals for the standalone plugin."}
+{"file":"openspec/changes/add-apertis-provider-plugin/design.md","reason":"Architecture decisions for clone-install discovery, fallback models, and offline verification."}
+{"file":"openspec/changes/add-apertis-provider-plugin/specs/apertis-provider-profile/spec.md","reason":"Behavioral requirements for provider registration and configuration."}
+{"file":"openspec/changes/add-apertis-provider-plugin/specs/apertis-provider-installation/spec.md","reason":"Behavioral requirements for install and configuration documentation."}
