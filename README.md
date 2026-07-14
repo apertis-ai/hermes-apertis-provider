@@ -15,10 +15,35 @@ from your Hermes profile and does not require a Hermes source-tree change.
 
 ## Install
 
-The installer places the provider in the active Hermes profile. For the first
-published stable release, review the script and then run it pinned to `v1.0.0`.
-These release-pinned commands become available when the `v1.0.0` tag is
-published on GitHub:
+### Native Hermes install
+
+Hermes versions with standalone model-provider distribution support can install
+and manage the Git repository directly:
+
+```sh
+hermes plugins install apertis-ai/hermes-apertis-provider
+```
+
+The manifest declares `kind: model-provider`, so Hermes places the checkout at
+`$HERMES_HOME/plugins/model-providers/apertis-provider/`, prompts for
+`APERTIS_API_KEY` when needed, and makes the profile available to `hermes
+model`. Model providers do not use the general `plugins.enabled` list.
+
+This native route depends on Hermes' `hermes_agent.model_providers` distribution
+contract. Until that support is present in your installed Hermes release, use
+the release-pinned installer below.
+
+The concrete compatibility gate is a Hermes version that exposes
+`providers.MODEL_PROVIDER_ENTRY_POINTS_GROUP` with the value
+`hermes_agent.model_providers`; upstream support is tracked in
+[NousResearch/hermes-agent#64277](https://github.com/NousResearch/hermes-agent/pull/64277).
+Older Hermes releases do not scan the wheel entry point, so use the pinned Git
+installer until that change appears in a Hermes release.
+
+### Release-pinned Git install
+
+The installer works with older Hermes releases and places the provider in the
+active Hermes profile. Review the tagged script and run it pinned to `v1.1.0`:
 
 ```sh
 (
@@ -28,9 +53,9 @@ published on GitHub:
   trap 'exit 1' HUP INT TERM
   curl --fail --silent --show-error --location \
     --output "$installer" \
-    https://raw.githubusercontent.com/apertis-ai/hermes-apertis-provider/v1.0.0/scripts/install.sh
+    https://raw.githubusercontent.com/apertis-ai/hermes-apertis-provider/v1.1.0/scripts/install.sh
   less "$installer"
-  APERTIS_PLUGIN_REF=v1.0.0 sh "$installer"
+  APERTIS_PLUGIN_REF=v1.1.0 sh "$installer"
 )
 ```
 
@@ -43,11 +68,10 @@ After reviewing the tagged script, the equivalent non-interactive one-line
 install keeps the same fail-fast download and cleanup behavior:
 
 ```sh
-( set -eu; installer=$(mktemp "${TMPDIR:-/tmp}/hermes-apertis-install.XXXXXX"); trap 'rm -f "$installer"' 0; trap 'exit 1' HUP INT TERM; curl --fail --silent --show-error --location --output "$installer" https://raw.githubusercontent.com/apertis-ai/hermes-apertis-provider/v1.0.0/scripts/install.sh; APERTIS_PLUGIN_REF=v1.0.0 sh "$installer"; )
+( set -eu; installer=$(mktemp "${TMPDIR:-/tmp}/hermes-apertis-install.XXXXXX"); trap 'rm -f "$installer"' 0; trap 'exit 1' HUP INT TERM; curl --fail --silent --show-error --location --output "$installer" https://raw.githubusercontent.com/apertis-ai/hermes-apertis-provider/v1.1.0/scripts/install.sh; APERTIS_PLUGIN_REF=v1.1.0 sh "$installer"; )
 ```
 
-Before that tag is published, install the current development snapshot by
-cloning `main` directly:
+To test the current development snapshot instead, clone `main` directly:
 
 ```sh
 export HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
@@ -56,7 +80,31 @@ git clone https://github.com/apertis-ai/hermes-apertis-provider.git \
   "$HERMES_HOME/plugins/model-providers/apertis"
 ```
 
+### Python package
+
+On a compatible Hermes version, install the wheel into the same Python
+environment as Hermes:
+
+```sh
+python -m pip install hermes-apertis-provider==1.1.0
+```
+
+The package has no runtime dependencies and exposes the zero-argument Apertis
+registration function through `hermes_agent.model_providers`. Installing it in
+an unrelated Python environment will not make it visible to Hermes.
+
 ### Update
+
+Choose the command matching the installation method; do not layer one method on
+top of another:
+
+```sh
+# Native Hermes Git install.
+hermes plugins update model-providers/apertis-provider
+
+# Python package install.
+python -m pip install --upgrade hermes-apertis-provider==1.1.0
+```
 
 If `scripts/install.sh` is missing, the provider was installed with the earlier
 manual-clone instructions. Bootstrap that checkout by fast-forwarding it to
@@ -69,7 +117,7 @@ git -C "${HERMES_HOME:-$HOME/.hermes}/plugins/model-providers/apertis" \
 
 Then run the `APERTIS_PLUGIN_REF=main` update below. The installer intentionally
 rejects non-fast-forward updates, so never use the pinned command to downgrade
-a checkout that has already advanced beyond `v1.0.0`; use a separate checkout
+a checkout that has already advanced beyond `v1.1.0`; use a separate checkout
 if you need to preserve an older release.
 
 Run the installed script with the ref you want to follow:
@@ -80,11 +128,11 @@ APERTIS_PLUGIN_REF=main \
   sh "${HERMES_HOME:-$HOME/.hermes}/plugins/model-providers/apertis/scripts/install.sh"
 
 # Or remain pinned to the stable release.
-APERTIS_PLUGIN_REF=v1.0.0 \
+APERTIS_PLUGIN_REF=v1.1.0 \
   sh "${HERMES_HOME:-$HOME/.hermes}/plugins/model-providers/apertis/scripts/install.sh"
 ```
 
-Version-shaped short refs such as `v1.0.0` resolve only to release tags. Other
+Version-shaped short refs such as `v1.1.0` resolve only to release tags. Other
 short refs resolve only to branches; fully qualified `refs/tags/...` and
 `refs/heads/...` values are also accepted.
 
@@ -93,8 +141,10 @@ overwritten by the selected ref, the target is not a Git checkout, it uses a
 different `origin`, or it cannot fast-forward. The installer never stashes,
 resets, or deletes an existing provider checkout.
 
-For every installation method, the final directory must contain `__init__.py`
-and `plugin.yaml` directly.
+For Git installations, the final directory must contain `__init__.py` and
+`plugin.yaml` directly. A pip installation is independent of that checkout;
+roll it back with an explicit package version rather than rewriting a Git
+installation.
 
 ## Configure Hermes
 
@@ -146,8 +196,9 @@ check calls the account-aware `/v1/models` endpoint.
 
 ## Development
 
-This repository has no runtime dependencies. Run its offline metadata tests
-without a Hermes installation, API key, or network access:
+The published package has no runtime dependencies. Run the repository's offline
+metadata and installer tests without a Hermes installation, API key, or network
+access:
 
 ```sh
 python3 -m unittest discover -s tests -v
@@ -157,9 +208,9 @@ python3 -m unittest discover -s tests -v
 
 This plugin only declares Apertis provider metadata for Hermes' existing
 generic transport and discovery system. It is distributed through this
-repository and GitHub Releases. It does not modify Hermes Agent, add a custom
-transport or authentication flow, publish a PyPI package, or guarantee model
-access for any Apertis plan.
+repository, GitHub Releases, and PyPI. It does not modify Hermes Agent, add a
+custom transport or authentication flow, or guarantee model access for any
+Apertis plan.
 
 ## License
 
