@@ -9,7 +9,9 @@ import types
 import unittest
 
 
-PLUGIN_PATH = Path(__file__).resolve().parents[1] / "__init__.py"
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+PLUGIN_PATH = REPOSITORY_ROOT / "__init__.py"
+README_PATH = REPOSITORY_ROOT / "README.md"
 
 
 class ProviderProfile:
@@ -81,6 +83,11 @@ class ApertisProfileTests(unittest.TestCase):
                 "gemini-3.1-pro-preview",
             ),
         )
+
+    def test_readme_uses_canonical_default_model_key(self) -> None:
+        readme = README_PATH.read_text(encoding="utf-8")
+        self.assertIn("  default: gpt-5.5", readme)
+        self.assertNotIn("  model: gpt-5.5", readme)
 
 
 if __name__ == "__main__":

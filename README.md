@@ -43,7 +43,7 @@ Select Apertis in `$HERMES_HOME/config.yaml`:
 ```yaml
 model:
   provider: apertis
-  model: gpt-5.5
+  default: gpt-5.5
 ```
 
 The aliases `apertis-ai` and `apertis-api` resolve to the same provider.
