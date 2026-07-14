@@ -209,6 +209,9 @@ class ApertisProfileTests(unittest.TestCase):
         )
         self.assertIn("pip install hermes-apertis-provider==1.1.0", readme)
         self.assertIn("hermes_agent.model_providers", readme)
+        self.assertIn("providers.MODEL_PROVIDER_ENTRY_POINTS_GROUP", readme)
+        self.assertIn("NousResearch/hermes-agent/pull/64277", readme)
+        self.assertIn("Older Hermes releases do not scan the wheel entry point", readme)
 
     def test_publish_workflow_uses_oidc_and_pinned_actions(self) -> None:
         workflow = PUBLISH_WORKFLOW_PATH.read_text(encoding="utf-8")

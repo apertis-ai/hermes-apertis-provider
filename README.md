@@ -33,6 +33,13 @@ This native route depends on Hermes' `hermes_agent.model_providers` distribution
 contract. Until that support is present in your installed Hermes release, use
 the release-pinned installer below.
 
+The concrete compatibility gate is a Hermes version that exposes
+`providers.MODEL_PROVIDER_ENTRY_POINTS_GROUP` with the value
+`hermes_agent.model_providers`; upstream support is tracked in
+[NousResearch/hermes-agent#64277](https://github.com/NousResearch/hermes-agent/pull/64277).
+Older Hermes releases do not scan the wheel entry point, so use the pinned Git
+installer until that change appears in a Hermes release.
+
 ### Release-pinned Git install
 
 The installer works with older Hermes releases and places the provider in the
