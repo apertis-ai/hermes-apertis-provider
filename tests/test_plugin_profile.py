@@ -11,16 +11,20 @@ import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 import types
 import unittest
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_PATH = REPOSITORY_ROOT / "__init__.py"
+PACKAGE_PATH = REPOSITORY_ROOT / "hermes_apertis_provider" / "__init__.py"
+PYPROJECT_PATH = REPOSITORY_ROOT / "pyproject.toml"
 README_PATH = REPOSITORY_ROOT / "README.md"
 INSTALLER_PATH = REPOSITORY_ROOT / "scripts" / "install.sh"
 MANIFEST_PATH = REPOSITORY_ROOT / "plugin.yaml"
 CHANGELOG_PATH = REPOSITORY_ROOT / "CHANGELOG.md"
+PUBLISH_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "publish-pypi.yml"
 
 
 class ProviderProfile:
@@ -31,7 +35,7 @@ class ProviderProfile:
 
 
 def load_profile() -> ProviderProfile:
-    """Import the plugin with only its two Hermes import dependencies stubbed."""
+    """Import the directory plugin with only its Hermes boundary stubbed."""
 
     registered: list[ProviderProfile] = []
     providers_module = types.ModuleType("providers")
@@ -39,13 +43,16 @@ def load_profile() -> ProviderProfile:
     base_module = types.ModuleType("providers.base")
     base_module.ProviderProfile = ProviderProfile
 
-    module_names = ("providers", "providers.base", "apertis_profile_under_test")
+    module_name = "apertis_profile_under_test"
+    module_names = ("providers", "providers.base", module_name)
     previous_modules = {name: sys.modules.get(name) for name in module_names}
     try:
         sys.modules["providers"] = providers_module
         sys.modules["providers.base"] = base_module
         spec = importlib.util.spec_from_file_location(
-            "apertis_profile_under_test", PLUGIN_PATH
+            module_name,
+            PLUGIN_PATH,
+            submodule_search_locations=[str(REPOSITORY_ROOT)],
         )
         assert spec is not None and spec.loader is not None
         plugin_module = importlib.util.module_from_spec(spec)
@@ -57,10 +64,51 @@ def load_profile() -> ProviderProfile:
                 sys.modules.pop(name, None)
             else:
                 sys.modules[name] = module
+        for name in tuple(sys.modules):
+            if name.startswith(f"{module_name}."):
+                sys.modules.pop(name, None)
 
     if len(registered) != 1:
         raise AssertionError(f"expected one registered profile, got {len(registered)}")
     return registered[0]
+
+
+def load_packaged_profile() -> tuple[ProviderProfile, types.ModuleType]:
+    """Load and invoke the pip entry-point module against a stub Hermes host."""
+
+    registered: list[ProviderProfile] = []
+    providers_module = types.ModuleType("providers")
+    providers_module.register_provider = registered.append
+    base_module = types.ModuleType("providers.base")
+    base_module.ProviderProfile = ProviderProfile
+
+    module_name = "hermes_apertis_provider_under_test"
+    module_names = ("providers", "providers.base", module_name)
+    previous_modules = {name: sys.modules.get(name) for name in module_names}
+    try:
+        sys.modules["providers"] = providers_module
+        sys.modules["providers.base"] = base_module
+        spec = importlib.util.spec_from_file_location(
+            module_name,
+            PACKAGE_PATH,
+            submodule_search_locations=[str(PACKAGE_PATH.parent)],
+        )
+        assert spec is not None and spec.loader is not None
+        package_module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = package_module
+        spec.loader.exec_module(package_module)
+        self_register = getattr(package_module, "register")
+        self_register()
+    finally:
+        for name, module in previous_modules.items():
+            if module is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = module
+
+    if len(registered) != 1:
+        raise AssertionError(f"expected one registered profile, got {len(registered)}")
+    return registered[0], package_module
 
 
 class ApertisProfileTests(unittest.TestCase):
@@ -94,6 +142,21 @@ class ApertisProfileTests(unittest.TestCase):
             ),
         )
 
+    def test_packaged_entry_point_matches_directory_profile(self) -> None:
+        packaged, package_module = load_packaged_profile()
+        self.assertEqual(packaged.__dict__, self.profile.__dict__)
+        self.assertEqual(package_module.__version__, "1.1.0")
+
+    def test_python_package_metadata(self) -> None:
+        metadata = tomllib.loads(PYPROJECT_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(metadata["project"]["name"], "hermes-apertis-provider")
+        self.assertEqual(metadata["project"]["version"], "1.1.0")
+        self.assertEqual(metadata["project"].get("dependencies", []), [])
+        self.assertEqual(
+            metadata["project"]["entry-points"]["hermes_agent.model_providers"],
+            {"apertis": "hermes_apertis_provider:register"},
+        )
+
     def test_readme_uses_canonical_default_model_key(self) -> None:
         readme = README_PATH.read_text(encoding="utf-8")
         self.assertIn("  default: gpt-5.6-sol", readme)
@@ -104,13 +167,13 @@ class ApertisProfileTests(unittest.TestCase):
         readme = README_PATH.read_text(encoding="utf-8")
         self.assertIn(
             "raw.githubusercontent.com/apertis-ai/hermes-apertis-provider/"
-            "v1.0.0/scripts/install.sh",
+            "v1.1.0/scripts/install.sh",
             readme,
         )
-        self.assertIn("APERTIS_PLUGIN_REF=v1.0.0", readme)
+        self.assertIn("APERTIS_PLUGIN_REF=v1.1.0", readme)
         self.assertIn("mktemp", readme)
         self.assertIn("( set -eu; installer=$(mktemp", readme)
-        self.assertIn("when the `v1.0.0` tag is\npublished", readme)
+        self.assertIn("Review the tagged script", readme)
         self.assertIn(
             "git clone https://github.com/apertis-ai/hermes-apertis-provider.git",
             readme,
@@ -133,9 +196,33 @@ class ApertisProfileTests(unittest.TestCase):
         manifest = MANIFEST_PATH.read_text(encoding="utf-8")
         readme = README_PATH.read_text(encoding="utf-8")
         changelog = CHANGELOG_PATH.read_text(encoding="utf-8")
-        self.assertIn("version: 1.0.0", manifest)
-        self.assertIn("v1.0.0", readme)
-        self.assertIn("## [1.0.0] - 2026-07-14", changelog)
+        metadata = tomllib.loads(PYPROJECT_PATH.read_text(encoding="utf-8"))
+        self.assertIn("version: 1.1.0", manifest)
+        self.assertEqual(metadata["project"]["version"], "1.1.0")
+        self.assertIn("v1.1.0", readme)
+        self.assertIn("## [1.1.0] - 2026-07-14", changelog)
+
+    def test_readme_documents_native_and_pip_installs(self) -> None:
+        readme = README_PATH.read_text(encoding="utf-8")
+        self.assertIn(
+            "hermes plugins install apertis-ai/hermes-apertis-provider", readme
+        )
+        self.assertIn("pip install hermes-apertis-provider==1.1.0", readme)
+        self.assertIn("hermes_agent.model_providers", readme)
+
+    def test_publish_workflow_uses_oidc_and_pinned_actions(self) -> None:
+        workflow = PUBLISH_WORKFLOW_PATH.read_text(encoding="utf-8")
+        self.assertIn("id-token: write", workflow)
+        self.assertIn("environment: pypi", workflow)
+        self.assertIn("release:", workflow)
+        self.assertIn("types: [published]", workflow)
+        self.assertNotIn("password:", workflow)
+        for line in workflow.splitlines():
+            if "uses:" not in line:
+                continue
+            reference = line.split("uses:", 1)[1].split("#", 1)[0].strip()
+            revision = reference.rsplit("@", 1)[-1]
+            self.assertRegex(revision, r"^[0-9a-f]{40}$")
 
 
 class InstallerTests(unittest.TestCase):

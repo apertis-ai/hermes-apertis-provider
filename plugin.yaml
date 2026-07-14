@@ -1,5 +1,10 @@
 name: apertis-provider
 kind: model-provider
-version: 1.0.0
+version: 1.1.0
 description: Apertis AI model provider for Hermes Agent
 author: Apertis AI
+requires_env:
+  - name: APERTIS_API_KEY
+    description: Apertis API key
+    url: https://api.apertis.ai/
+    secret: true
