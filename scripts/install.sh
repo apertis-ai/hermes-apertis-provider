@@ -190,7 +190,8 @@ if [ -e "$target" ] || [ -L "$target" ]; then
             if [ -L "$target/$ancestor_path" ] || \
                 { [ -e "$target/$ancestor_path" ] && \
                     [ ! -d "$target/$ancestor_path" ]; }; then
-                if ! git -C "$target" ls-files --error-unmatch -- \
+                if ! git -C "$target" --literal-pathspecs \
+                    ls-files --error-unmatch -- \
                     "$ancestor_path" >/dev/null 2>&1; then
                     set +f
                     IFS=$previous_ifs
@@ -199,13 +200,15 @@ if [ -e "$target" ] || [ -L "$target" ]; then
             fi
         done
         if [ -e "$target/$relative_path" ] || [ -L "$target/$relative_path" ]; then
-            tracked_paths=$(git -C "$target" ls-files -- "$relative_path") || {
+            tracked_paths=$(git -C "$target" --literal-pathspecs \
+                ls-files -- "$relative_path") || {
                 set +f
                 IFS=$previous_ifs
                 fail "could not inspect tracked paths under $relative_path"
             }
-            ignored_paths=$(git -C "$target" ls-files --others --ignored \
-                --exclude-standard -- "$relative_path") || {
+            ignored_paths=$(git -C "$target" --literal-pathspecs \
+                ls-files --others --ignored --exclude-standard -- \
+                "$relative_path") || {
                 set +f
                 IFS=$previous_ifs
                 fail "could not inspect ignored paths under $relative_path"

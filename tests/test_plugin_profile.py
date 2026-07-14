@@ -297,6 +297,36 @@ class InstallerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(local_file.read_text(encoding="utf-8"), "keep me")
 
+    def test_literal_ignored_ancestor_is_not_confused_with_pathspec(self) -> None:
+        (self.source / ".gitignore").write_text("a\\[bc\\]\n", encoding="utf-8")
+        (self.source / "ab").write_text("tracked\n", encoding="utf-8")
+        self.run_git("add", ".gitignore", "ab", cwd=self.source)
+        self.run_git("commit", "-m", "add pathspec collision fixture", cwd=self.source)
+        self.assertEqual(self.run_installer().returncode, 0)
+        local_file = self.target / "a[bc]"
+        local_file.write_text("keep me", encoding="utf-8")
+        self.assertEqual(
+            self.run_git("status", "--porcelain", "--untracked-files=all", cwd=self.target),
+            "",
+        )
+        remote_file = self.source / "a[bc]" / "created.txt"
+        remote_file.parent.mkdir()
+        remote_file.write_text("remote\n", encoding="utf-8")
+        self.run_git(
+            "--literal-pathspecs",
+            "add",
+            "-f",
+            "--",
+            "a[bc]/created.txt",
+            cwd=self.source,
+        )
+        self.run_git("commit", "-m", "track literal pathspec ancestor", cwd=self.source)
+
+        result = self.run_installer()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(local_file.read_text(encoding="utf-8"), "keep me")
+
     def test_unrelated_ignored_file_does_not_block_update(self) -> None:
         (self.source / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
         self.run_git("add", ".gitignore", cwd=self.source)
