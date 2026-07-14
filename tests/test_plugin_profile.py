@@ -85,6 +85,7 @@ class ApertisProfileTests(unittest.TestCase):
         self.assertEqual(
             self.profile.fallback_models,
             (
+                "gpt-5.6-sol",
                 "gpt-5.5",
                 "gpt-5.4-mini",
                 "claude-opus-4-8",

@@ -16,6 +16,7 @@ apertis = ProviderProfile(
     auth_type="api_key",
     default_aux_model="gpt-5.4-mini",
     fallback_models=(
+        "gpt-5.6-sol",
         "gpt-5.5",
         "gpt-5.4-mini",
         "claude-opus-4-8",
