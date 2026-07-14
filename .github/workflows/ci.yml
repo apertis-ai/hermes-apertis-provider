@@ -81,6 +81,11 @@ jobs:
     name: Package artifacts
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      # Remove this compatibility pin after NousResearch/hermes-agent#64277
+      # ships in an official Hermes release.
+      HERMES_COMPAT_REPOSITORY: https://github.com/theQuert/hermes-agent.git
+      HERMES_COMPAT_SHA: 6a123205c83ea425021d586fa16e2a54680e5667
 
     steps:
       - name: Check out repository
@@ -97,7 +102,7 @@ jobs:
           python -m build
           python -m twine check dist/*
 
-      - name: Verify wheel discovery against Hermes main
+      - name: Verify wheel discovery against compatible Hermes
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
@@ -105,7 +110,11 @@ jobs:
           hermes_checkout="$RUNNER_TEMP/hermes-agent"
           wheel_venv="$RUNNER_TEMP/wheel-venv"
 
-          git clone --depth 1 https://github.com/NousResearch/hermes-agent.git "$hermes_checkout"
+          git init "$hermes_checkout"
+          git -C "$hermes_checkout" remote add origin "$HERMES_COMPAT_REPOSITORY"
+          git -C "$hermes_checkout" fetch --depth 1 origin "$HERMES_COMPAT_SHA"
+          git -C "$hermes_checkout" checkout --detach FETCH_HEAD
+          test "$(git -C "$hermes_checkout" rev-parse HEAD)" = "$HERMES_COMPAT_SHA"
           python -m venv "$wheel_venv"
           "$wheel_venv/bin/python" -m pip install dist/*.whl
 

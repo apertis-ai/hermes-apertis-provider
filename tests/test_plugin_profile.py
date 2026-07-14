@@ -25,6 +25,7 @@ INSTALLER_PATH = REPOSITORY_ROOT / "scripts" / "install.sh"
 MANIFEST_PATH = REPOSITORY_ROOT / "plugin.yaml"
 CHANGELOG_PATH = REPOSITORY_ROOT / "CHANGELOG.md"
 PUBLISH_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "publish-pypi.yml"
+CI_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
 
 
 class ProviderProfile:
@@ -226,6 +227,23 @@ class ApertisProfileTests(unittest.TestCase):
             reference = line.split("uses:", 1)[1].split("#", 1)[0].strip()
             revision = reference.rsplit("@", 1)[-1]
             self.assertRegex(revision, r"^[0-9a-f]{40}$")
+
+    def test_wheel_canary_pins_the_compatible_hermes_revision(self) -> None:
+        workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+        self.assertIn(
+            "HERMES_COMPAT_REPOSITORY: https://github.com/theQuert/hermes-agent.git",
+            workflow,
+        )
+        self.assertIn(
+            "HERMES_COMPAT_SHA: 6a123205c83ea425021d586fa16e2a54680e5667",
+            workflow,
+        )
+        self.assertIn('fetch --depth 1 origin "$HERMES_COMPAT_SHA"', workflow)
+        self.assertIn(
+            'test "$(git -C "$hermes_checkout" rev-parse HEAD)" = '
+            '"$HERMES_COMPAT_SHA"',
+            workflow,
+        )
 
 
 class InstallerTests(unittest.TestCase):
