@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.codex/
+
+# Local development workflow artifacts; never publish these with the plugin.
+openspec/
+docs/superpowers/plans/
